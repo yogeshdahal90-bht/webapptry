@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report an Issue</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f4f7f6; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .app-container { background: #ffffff; width: 100%; max-width: 400px; padding: 25px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+        h2 { margin-top: 0; color: #333; font-size: 22px; text-align: center; }
+        label { font-weight: 600; font-size: 14px; color: #555; display: block; margin-bottom: 8px; margin-top: 20px; }
+        select, input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; background-color: #fafafa; }
+        select:focus, input[type="text"]:focus { outline: none; border-color: #007bff; background-color: #fff; }
+        button { width: 100%; background-color: #007bff; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 25px; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: #0056b3; }
+        #message { margin-top: 15px; text-align: center; font-size: 14px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h2>Issue Reporter</h2>
+    <form id="issueForm">
+        <label for="issueType">Select Issue Type</label>
+        <select id="issueType" required>
+            <option value="" disabled selected>-- Choose an option --</option>
+            <option value="Pothole">Pothole</option>
+            <option value="Leakage">Leakage</option>
+            <option value="Overgrown Tree">Overgrown Tree</option>
+        </select>
+
+        <label for="notes">Short Note (Max 3-5 words)</label>
+        <input type="text" id="notes" placeholder="e.g., Near main gate" maxlength="50">
+
+        <button type="submit" id="submitBtn">Submit Report</button>
+    </form>
+    <div id="message"></div>
+</div>
+
+<script>
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_Shdhm5kOuQjWbWrjpdMy5hdVYl2hRn2ZA00cwNSNCOqPtOHT8nR1IicI_WxxlW3oLw/exec'; // Paste your Google Web App URL here
+
+    document.getElementById('issueForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const submitBtn = document.getElementById('submitBtn');
+        const messageDiv = document.getElementById('message');
+        
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Sending...';
+        messageDiv.innerText = '';
+
+        const payload = {
+            issueType: document.getElementById('issueType').value,
+            notes: document.getElementById('notes').value
+        };
+
+        fetch(WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors', // Needed to bypass CORS limits with Google Apps Script
+            cache: 'no-cache',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(() => {
+            messageDiv.style.color = 'green';
+            messageDiv.innerText = '✓ Report submitted successfully!';
+            document.getElementById('issueForm').reset();
+        })
+        .catch(error => {
+            messageDiv.style.color = 'red';
+            messageDiv.innerText = 'Error submitting report. Try again.';
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Submit Report';
+        });
+    });
+</script>
+
+</body>
+</html>
