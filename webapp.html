@@ -39,7 +39,29 @@
 </div>
 
 <script>
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_Shdhm5kOuQjWbWrjpdMy5hdVYl2hRn2ZA00cwNSNCOqPtOHT8nR1IicI_WxxlW3oLw/exec'; // Paste your Google Web App URL here
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_Shdhm5kOuQjWbWrjpdMy5hdVYl2hRn2ZA00cwNSNCOqPtOHT8nR1IicI_WxxlW3oLw/exec'; 
+    let userLatitude = null;
+    let userLongitude = null;
+
+    // Request location access immediately when the app opens
+    window.addEventListener('load', () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    userLatitude = position.coords.latitude;
+                    userLongitude = position.coords.longitude;
+                    console.log("Location captured:", userLatitude, userLongitude);
+                },
+                (error) => {
+                    console.warn("Location access denied or unavailable:", error.message);
+                    alert("To map this issue accurately, please allow location access if prompted.");
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+    });
 
     document.getElementById('issueForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -51,14 +73,17 @@
         submitBtn.innerText = 'Sending...';
         messageDiv.innerText = '';
 
+        // Bundle everything, including coordinates (or null if they denied permission)
         const payload = {
             issueType: document.getElementById('issueType').value,
-            notes: document.getElementById('notes').value
+            notes: document.getElementById('notes').value,
+            latitude: userLatitude,
+            longitude: userLongitude
         };
 
         fetch(WEB_APP_URL, {
             method: 'POST',
-            mode: 'no-cors', // Needed to bypass CORS limits with Google Apps Script
+            mode: 'no-cors',
             cache: 'no-cache',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
