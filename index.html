@@ -3,66 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report an Issue</title>
+    <title>Community Reporter</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background-color: #f4f7f6; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .app-container { background: #ffffff; width: 100%; max-width: 400px; padding: 25px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #f4f7f6; }
+        
+        /* Navigation Tabs */
+        .nav-bar { display: flex; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: fixed; top: 0; width: 100%; z-index: 2000; }
+        .nav-tab { flex: 1; text-align: center; padding: 15px; font-weight: bold; color: #666; cursor: pointer; border-bottom: 3px solid transparent; }
+        .nav-tab.active { color: #007bff; border-bottom: 3px solid #007bff; }
+        
+        /* Views Container */
+        .view-content { padding-top: 55px; height: 100%; width: 100%; }
+        .app-view { display: none; height: 100%; width: 100%; }
+        .app-view.active { display: block; }
+
+        /* Form Styling */
+        .form-container { padding: 30px 20px; display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 55px); }
+        .app-card { background: #ffffff; width: 100%; max-width: 400px; padding: 25px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
         h2 { margin-top: 0; color: #333; font-size: 22px; text-align: center; }
         label { font-weight: 600; font-size: 14px; color: #555; display: block; margin-bottom: 8px; margin-top: 20px; }
         select, input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; background-color: #fafafa; }
-        select:focus, input[type="text"]:focus { outline: none; border-color: #007bff; background-color: #fff; }
-        button { width: 100%; background-color: #007bff; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 25px; cursor: pointer; transition: background 0.2s; }
-        button:hover { background-color: #0056b3; }
+        button { width: 100%; background-color: #007bff; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 25px; cursor: pointer; }
         #message { margin-top: 15px; text-align: center; font-size: 14px; font-weight: bold; }
+
+        /* Map Styling */
+        #map { width: 100%; height: 100%; }
+
+        /* Custom Map Legend */
+        .map-legend { background: white; padding: 10px; line-height: 18px; color: #555; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2); font-size: 12px; }
+        .map-legend i { width: 14px; height: 14px; float: left; margin-right: 8px; opacity: 0.8; border-radius: 50%; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <h2>Issue Reporter</h2>
-    <form id="issueForm">
-        <label for="issueType">Select Issue Type</label>
-        <select id="issueType" required>
-            <option value="" disabled selected>-- Choose an option --</option>
-            <option value="Pothole">Pothole</option>
-            <option value="Leakage">Leakage</option>
-            <option value="Overgrown Tree">Overgrown Tree</option>
-        </select>
-
-        <label for="notes">Short Note (Max 3-5 words)</label>
-        <input type="text" id="notes" placeholder="e.g., Near main gate" maxlength="50">
-
-        <button type="submit" id="submitBtn">Submit Report</button>
-    </form>
-    <div id="message"></div>
+<div class="nav-bar">
+    <div class="nav-tab active" id="tabForm" onclick="switchView('form')">Report Issue</div>
+    <div class="nav-tab" id="tabMap" onclick="switchView('map')">View Map</div>
 </div>
 
+<div class="view-content">
+    <div id="formView" class="app-view active">
+        <div class="form-container">
+            <div class="app-card">
+                <h2>Issue Reporter</h2>
+                <form id="issueForm">
+                    <label for="issueType">Select Issue Type</label>
+                    <select id="issueType" required>
+                        <option value="" disabled selected>-- Choose an option --</option>
+                        <option value="Pothole">Pothole 🔴</option>
+                        <option value="Leakage">Leakage 🔵</option>
+                        <option value="Overgrown Tree">Overgrown Tree 🟢</option>
+                    </select>
+
+                    <label for="notes">Short Note (Max 3-5 words)</label>
+                    <input type="text" id="notes" placeholder="e.g., Near main gate" maxlength="50">
+
+                    <button type="submit" id="submitBtn">Submit Report</button>
+                </form>
+                <div id="message"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mapView" class="app-view">
+        <div id="map"></div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
 <script>
+    // --- CONFIGURATION CONFIG ---
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw_Shdhm5kOuQjWbWrjpdMy5hdVYl2hRn2ZA00cwNSNCOqPtOHT8nR1IicI_WxxlW3oLw/exec'; 
+    const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT89Tgmhe-oE_tZ2xNiad-rKlAJ4q830UCgplXQeEjxeocT0REhBIeHy7lbEK2K5wJpclomOKJdfIh1/pub?output=csv';
+
     let userLatitude = null;
     let userLongitude = null;
+    let map = null;
+    
+    // Layer Groups for Category Toggling
+    let layerGroups = {
+        'Pothole': L.layerGroup(),
+        'Leakage': L.layerGroup(),
+        'Overgrown Tree': L.layerGroup()
+    };
 
-    // Request location access immediately when the app opens
+    // Color definitions for map assets
+    const colors = {
+        'Pothole': '#ff4d4d',       // Red
+        'Leakage': '#007bff',       // Blue
+        'Overgrown Tree': '#28a745' // Green
+    };
+
+    // --- GEOLOCATION SETTINGS ---
     window.addEventListener('load', () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     userLatitude = position.coords.latitude;
                     userLongitude = position.coords.longitude;
-                    console.log("Location captured:", userLatitude, userLongitude);
                 },
-                (error) => {
-                    console.warn("Location access denied or unavailable:", error.message);
-                    alert("To map this issue accurately, please allow location access if prompted.");
-                },
+                (error) => { console.warn("Location access denied:", error.message); },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
-        } else {
-            alert("Geolocation is not supported by this browser.");
         }
     });
 
+    // --- UI NAVIGATION LOGIC ---
+    function switchView(viewName) {
+        document.querySelectorAll('.app-view').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+        
+        if (viewName === 'form') {
+            document.getElementById('formView').classList.add('active');
+            document.getElementById('tabForm').classList.add('active');
+        } else if (viewName === 'map') {
+            document.getElementById('mapView').classList.add('active');
+            document.getElementById('tabMap').classList.add('active');
+            initOrRefreshMap();
+        }
+    }
+
+    // --- MAP DRAWING & LIVE DATA EXTRACTION ---
+    function initOrRefreshMap() {
+        // Build base layout if it doesn't exist
+        if (!map) {
+            // Default center point if GPS fails (Defaults to a global view, zooms to data later)
+            map = L.map('map').setView([0, 0], 2); 
+            
+            // Clean Vector Basemap (CartoDB Positron - crisp asset management layout)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            }).addTo(map);
+
+            // Add the Layer Control Widget (Select/Deselect checkboxes)
+            let overlays = {
+                "Potholes 🔴": layerGroups['Pothole'],
+                "Leakages 🔵": layerGroups['Leakage'],
+                "Overgrown Trees 🟢": layerGroups['Overgrown Tree']
+            };
+            L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+
+            // Add Color Legend Control
+            let legend = L.control({ position: 'bottomleft' });
+            legend.onAdd = function () {
+                let div = L.DomUtil.create('div', 'map-legend');
+                div.innerHTML = '<strong>Legend</strong><br>';
+                for (let key in colors) {
+                    div.innerHTML += `<i style="background: ${colors[key]}"></i> ${key}<br>`;
+                }
+                return div;
+            };
+            legend.addTo(map);
+        }
+
+        // Clear existing points before pulling fresh data
+        for (let key in layerGroups) {
+            layerGroups[key].clearLayers();
+            layerGroups[key].addTo(map); // Keep them active by default
+        }
+
+        // Fetch & parse the live CSV data stream from Google Sheets
+        Papa.parse(GOOGLE_SHEET_CSV_URL, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                let points = [];
+                
+                results.data.forEach(row => {
+                    let lat = parseFloat(row.Latitude || row.latitude);
+                    let lng = parseFloat(row.Longitude || row.longitude);
+                    let type = row['Issue Type'] || row.issueType;
+                    let note = row.Notes || row.notes || 'No notes';
+                    let time = row.Timestamp || 'Unknown time';
+
+                    if (!isNaN(lat) && !isNaN(lng) && layerGroups[type]) {
+                        // Generate circle marker based on standard asset schema
+                        let marker = L.circleMarker([lat, lng], {
+                            radius: 8,
+                            fillColor: colors[type],
+                            color: '#fff',
+                            weight: 1.5,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).bindPopup(`<strong>${type}</strong><br><em>"${note}"</em><br><small>${time}</small>`);
+                        
+                        layerGroups[type].addLayer(marker);
+                        points.push([lat, lng]);
+                    }
+                });
+
+                // Autofit map screen bounds so all active logged records are perfectly framed
+                if (points.length > 0) {
+                    map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
+                } else if (userLatitude && userLongitude) {
+                    map.setView([userLatitude, userLongitude], 14);
+                }
+            }
+        });
+    }
+
+    // --- FORM SUBMISSION PROCESSING ---
     document.getElementById('issueForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -71,9 +216,7 @@
         
         submitBtn.disabled = true;
         submitBtn.innerText = 'Sending...';
-        messageDiv.innerText = '';
 
-        // Bundle everything, including coordinates (or null if they denied permission)
         const payload = {
             issueType: document.getElementById('issueType').value,
             notes: document.getElementById('notes').value,
@@ -90,12 +233,18 @@
         })
         .then(() => {
             messageDiv.style.color = 'green';
-            messageDiv.innerText = '✓ Report submitted successfully!';
+            messageDiv.innerText = '✓ Report submitted! Directing to map...';
             document.getElementById('issueForm').reset();
+            
+            // Wait 1.5 seconds so they see success text, then auto-pivot to Map View
+            setTimeout(() => {
+                messageDiv.innerText = '';
+                switchView('map');
+            }, 1500);
         })
         .catch(error => {
             messageDiv.style.color = 'red';
-            messageDiv.innerText = 'Error submitting report. Try again.';
+            messageDiv.innerText = 'Submission error. Try again.';
             console.error('Error:', error);
         })
         .finally(() => {
@@ -104,6 +253,5 @@
         });
     });
 </script>
-
 </body>
 </html>
