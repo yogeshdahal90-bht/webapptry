@@ -127,25 +127,46 @@
         }
     }
 
-    // --- MAP DRAWING & LIVE DATA EXTRACTION ---
+// --- MAP DRAWING & LIVE DATA EXTRACTION ---
     function initOrRefreshMap() {
-        // Build base layout if it doesn't exist
+        // Build base layout and layers if they don't exist yet
         if (!map) {
-            // Default center point if GPS fails (Defaults to a global view, zooms to data later)
-            map = L.map('map').setView([0, 0], 2); 
-            
-            // Clean Vector Basemap (CartoDB Positron - crisp asset management layout)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-            }).addTo(map);
+            // 1. Define the Basemap Providers
+            let osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            });
 
-            // Add the Layer Control Widget (Select/Deselect checkboxes)
+            let cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            });
+
+            let esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            });
+
+            // Initialize map with Carto Light active by default
+            map = L.map('map', {
+                center: [0, 0],
+                zoom: 2,
+                layers: [cartoLight] // Default basemap
+            }); 
+
+            // 2. Format the control structures
+            let baseMaps = {
+                "Street Map 🗺️": osm,
+                "Light Canvas ⬜": cartoLight,
+                "Satellite Imagery 🛰️": esriSatellite
+            };
+
             let overlays = {
                 "Potholes 🔴": layerGroups['Pothole'],
                 "Leakages 🔵": layerGroups['Leakage'],
                 "Overgrown Trees 🟢": layerGroups['Overgrown Tree']
             };
-            L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+
+            // 3. Add the Control Widget combined with Basemaps and Overlays
+            // Passing baseMaps as the first argument turns them into radio buttons
+            L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
 
             // Add Color Legend Control
             let legend = L.control({ position: 'bottomleft' });
@@ -160,10 +181,10 @@
             legend.addTo(map);
         }
 
-        // Clear existing points before pulling fresh data
+        // Clear existing asset points before pulling fresh data
         for (let key in layerGroups) {
             layerGroups[key].clearLayers();
-            layerGroups[key].addTo(map); // Keep them active by default
+            layerGroups[key].addTo(map); // Keep overlay data visible by default
         }
 
         // Fetch & parse the live CSV data stream from Google Sheets
@@ -182,7 +203,6 @@
                     let time = row.Timestamp || 'Unknown time';
 
                     if (!isNaN(lat) && !isNaN(lng) && layerGroups[type]) {
-                        // Generate circle marker based on standard asset schema
                         let marker = L.circleMarker([lat, lng], {
                             radius: 8,
                             fillColor: colors[type],
